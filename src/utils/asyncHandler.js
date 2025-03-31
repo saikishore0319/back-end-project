@@ -1,6 +1,6 @@
-const asyncHandler = (fn) => async (req, res, next) => {
+const asyncHandler = (fn) =>  async (req, res, next) => {
   try {
-    await fn(req, res, next);
+     await fn(req, res, next);
   } catch (err) {
     const statusCode = err.statusCode || 500;
     res.status(statusCode).json({
