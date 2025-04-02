@@ -12,6 +12,9 @@ const cloudinaryUpload = async(localFilepath)=>{
     try {
         if(!localFilepath) return null;
         //upload file to cloudinary
+       /* The line `const response = await cloudinary.uploader.upload(localFilepath, { resource_type:
+       'auto' })` is uploading a file located at the `localFilepath` to Cloudinary using the
+       Cloudinary SDK. */
         const response = await cloudinary.uploader.upload(localFilepath,{
             resource_type: 'auto',
         })
