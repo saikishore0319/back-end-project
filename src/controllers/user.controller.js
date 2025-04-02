@@ -4,7 +4,7 @@ import { User } from "../models/user.model.js";
 import { cloudinaryUpload } from "../utils/coludinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
-const registerUser = asyncHandler(async (req, res) => {
+const registerUser = asyncHandler(async (req, res) => { 
   const { userName, email, fullName, password } = req.body;
 
   if (email) {
@@ -48,7 +48,7 @@ const registerUser = asyncHandler(async (req, res) => {
   const avatarResult = await cloudinaryUpload(avatarLocalPath);
   const coverImageResult = await cloudinaryUpload(coverImageLocalPath);
 
-  if (!avatar) {
+  if (!avatarResult) {
     throw new ApiError(400, "avatar file is required");
   }
 
@@ -58,11 +58,11 @@ const registerUser = asyncHandler(async (req, res) => {
     fullName,
     password,
     avatar: avatarResult.url,
-    coverImage: coverImage?.url || "",
+    coverImage: coverImageResult?.url || "",
   });
 
   const createdUser = await User.findById(user._id).select(
-    "-password -refershToken"
+    "-password -refreshToken"
   )
 
   if(!createdUser){
@@ -70,7 +70,7 @@ const registerUser = asyncHandler(async (req, res) => {
   }
   
   return res.status(201).json(
-    new ApiResponse(200,createdUser,"User created successfully")
+    new ApiResponse(200,createdUser,"User created successfully", )
   )
 });
 
