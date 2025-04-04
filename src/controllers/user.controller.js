@@ -4,10 +4,35 @@ import { User } from "../models/user.model.js";
 import { cloudinaryUpload } from "../utils/coludinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
-const registerUser = asyncHandler(async (req, res) => { 
+/**
+ * The function generates access and refresh tokens for a user based on their ID.
+ * @param userId - The `userId` parameter is the unique identifier of a user for whom we want to
+ * generate access and refresh tokens. It is used to find the user in the database and generate tokens
+ * for that specific user.
+ * @returns The `generateAccesssAndRefreshToken` function returns an object containing the access token
+ * and refresh token generated for the user.
+ */
+const generateAccesssAndRefreshToken = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+    user.save({ validateBeforeSave: false });
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw new ApiError(
+      500,
+      "something went wrong while generating access token"
+    );
+  }
+};
+
+const registerUser = asyncHandler(async (req, res) => {
   const { userName, email, fullName, password } = req.body;
   console.log(req.body);
-  
+
   if (email) {
     if (email.includes("@")) {
       // console.log("email", email);
@@ -42,7 +67,11 @@ const registerUser = asyncHandler(async (req, res) => {
   const avatarLocalPath = req.files?.avatar[0]?.path;
   // const coverImageLocalPath = req.files?.coverImage[0]?.path;
   let coverImageLocalPath;
-  if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0){
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
     coverImageLocalPath = req.files.coverImage[0].path;
   }
 
@@ -68,15 +97,112 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const createdUser = await User.findById(user._id).select(
     "-password -refreshToken"
-  )
+  );
 
-  if(!createdUser){
-    throw new ApiError(500,"failed to create a user")
+  if (!createdUser) {
+    throw new ApiError(500, "failed to create a user");
   }
-  
-  return res.status(201).json(
-    new ApiResponse(200,createdUser,"User created successfully", )
+
+  return res
+    .status(201)
+    .json(new ApiResponse(200, createdUser, "User created successfully"));
+});
+
+const loginUser = asyncHandler(async (req, res) => {
+  // const { email, userName, password } = req.body;
+
+  const email = req.body.email
+  const userName = req.body.userName
+  const password = req.body.password
+
+  console.log(email)
+  console.log(userName),
+  console.log("body of thr request ",req.body)
+
+  if (!(userName|| email)) {
+    throw new ApiError(400, "username or email is required");
+  }
+
+  const user = await User.findOne({
+    $or: [{ email }, { userName }],
+  });
+  console.log( "The user is " ,user)
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const isPasswordValid = await user.isPasswordCorrect(password);
+  console.log("is password valid ",isPasswordValid)
+
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid user credentials");
+  }
+
+  const { accessToken, refreshToken } = await generateAccesssAndRefreshToken(
+    user._id
+  );
+
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
+  /* The `const options` object is used to specify the options for setting cookies in the HTTP
+  response. In this case, the options are set as follows: */
+  /* `httpOnly` is set to true to prevent client-side JavaScript from accessing the cookie. `secure` is set to true to
+  ensure that the cookie is only sent over HTTPS connections. */
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  /* The function first checks if the user exists in the database using either their email or username.
+  If the user is found, it then checks if the provided password is correct using the `isPasswordCorrect`
+  method. If the password is valid, it generates access and refresh tokens using the `generateAccesssAndRefreshToken`
+  function. The access token and refresh token are then set as cookies in the HTTP response using the `res.cookie`
+  method. Finally, it returns a JSON response containing the logged-in user, access token, and refresh token. */
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          accessToken,
+          refreshToken,
+        },
+        "user logged in successfully"
+      )
+    );
+});
+
+const logoutUser = asyncHandler(async (req, res) => {
+  await User.findOneAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  const options ={
+    httpOnly : true,
+    secure : true,
+  }
+
+  return res
+  .status(200)
+  .clearCookie("accessToken", options)
+  .clearCookie("refreshToken", options)
+  .json(
+    new ApiResponse(200, {},"User logged out successfully")
   )
 });
 
-export { registerUser };
+export { registerUser, loginUser, logoutUser };
