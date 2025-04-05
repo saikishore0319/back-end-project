@@ -21,6 +21,10 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
       throw new ApiError(401, "invalid access token");
     }
 
+   /* `req.user = user;` is setting the `user` object retrieved from the database to the `user`
+   property of the `req` object. This allows the user information to be accessed and used in
+   subsequent middleware functions or routes in the application. By attaching the `user` object to
+   the `req` object, it can be easily accessed and utilized throughout the request-response cycle. */
     req.user = user;
     next();
   } catch (error) {
