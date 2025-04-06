@@ -1,8 +1,9 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiErrors.js";
 import { User } from "../models/user.model.js";
-import { cloudinaryUpload } from "../utils/coludinary.js";
+import { cloudinaryUpload, cloudinaryDelete } from "../utils/coludinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+
 
 /**
  * The function generates access and refresh tokens for a user based on their ID.
@@ -273,80 +274,106 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, req.user, "user fetched successfully"));
 });
 
-const updateUserDetails = asyncHandler(async(req, res)=>{
-  const {fullName, email} = req.body;
+const updateUserDetails = asyncHandler(async (req, res) => {
+  const { fullName, email } = req.body;
+  // console.log("here");
+  
 
-  if(!(fullName || email)){
-    throw new ApiError(400, "please enter full name or email to update user details");
+  if (!(fullName || email)) {
+    throw new ApiError(
+      400,
+      "please enter full name or email to update user details"
+    );
   }
-  const user = User.findByIdAndUpdate(
+  const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
-      $set:{
+      $set: {
         fullName: fullName,
-        email : email
-      }
+        email: email,
+      },
     },
     {
-      new : true
+      new: true,
     }
-  ).select("-password")
-  
-  return res
-  .status(200)
-  .json(new ApiResponse(200, user, "user details updated successfully"))
-})
+  ).select("-password");
 
-const updateUserAvatar = asyncHandler(async(req, res)=>{
-   const localPath = req.file?.path;
-   if (!localPath) {
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "user details updated successfully"));
+});
+
+const updateUserAvatar = asyncHandler(async (req, res) => {
+
+  const localPath = req.file?.path;
+
+
+  const user = await User.findById(req.user?._id).select("avatar");
+  // console.log(user)
+  const cloudinaryUrl = user?.avatar; // Access the avatar field
+  // console.log(cloudinaryUrl);
+  
+  if (!localPath) {
     throw new ApiError(400, "Avatar image is required");
   }
   const avatar = await cloudinaryUpload(localPath);
-  if(!avatar.url){
-    throw new ApiError(400, "Error while uploading avatar image")
+  if (!avatar.url) {
+    throw new ApiError(400, "Error while uploading avatar image");
   }
   const updatedUser = await User.findByIdAndUpdate(
-    req.user?._id, 
+    req.user?._id,
     {
-      $set:{
-        avatar : avatar.url
-      }
+      $set: {
+        avatar: avatar.url,
+      },
     },
     {
       new: true,
     }
-  ).select("-password")
+  ).select("-password");
+
+  if (cloudinaryUrl) {
+    const response = await cloudinaryDelete(cloudinaryUrl);
+    console.log(response);
+    
+  }
 
   return res
-  .status(200)
-  .json(new ApiResponse(200, updatedUser, "user updated successfully"));
-})
-const updateUserCoverImage = asyncHandler(async(req, res)=>{
-   const localPath = req.file?.path;
-   if (!localPath) {
+    .status(200)
+    .json(new ApiResponse(200, updatedUser, "user updated successfully"));
+});
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+  const localPath = req.file?.path;
+
+  
+  const coverimg = await User.findById(req.user._id).select("coverImage");
+  const cloudinaryUrl = coverimg?.coverImage
+  if (!localPath) {
     throw new ApiError(400, "Cover image file is required");
   }
   const coverImage = await cloudinaryUpload(localPath);
-  if(!coverImage.url){
-    throw new ApiError(400, "Error while uploading Cover image")
+  if (!coverImage.url) {
+    throw new ApiError(400, "Error while uploading Cover image");
   }
   const updatedUser = await User.findByIdAndUpdate(
-    req.user?._id, 
+    req.user?._id,
     {
-      $set:{
-        coverImage : coverImage.url
-      }
+      $set: {
+        coverImage: coverImage.url,
+      },
     },
     {
       new: true,
     }
-  ).select("-password")
+  ).select("-password");
+  if (cloudinaryUrl) {
+    cloudinaryDelete(cloudinaryUrl);
+  }
 
   return res
-  .status(200)
-  .json(new ApiResponse(200, updatedUser, "user updated successfully"));
-})
+    .status(200)
+    .json(new ApiResponse(200, updatedUser, "user updated successfully"));
+});
 export {
   registerUser,
   loginUser,
@@ -356,5 +383,5 @@ export {
   getCurrentUser,
   updateUserDetails,
   updateUserAvatar,
-  updateUserCoverImage
+  updateUserCoverImage,
 };

@@ -1,5 +1,7 @@
 import { v2 as cloudinary } from "cloudinary";
+import { extractPublicId } from "cloudinary-build-url";
 import fs from "fs";
+import { ApiError } from "./ApiErrors.js";
 
 cloudinary.config({ 
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,  
@@ -19,8 +21,8 @@ const cloudinaryUpload = async(localFilepath)=>{
             resource_type: 'auto',
         })
         //file upload done successfully
-        console.log(response.url);
-        console.log(response)
+        // console.log(response.url);
+        // console.log(response)
         fs.unlinkSync(localFilepath)
         return response;    
     } catch (error) {
@@ -34,4 +36,16 @@ const cloudinaryUpload = async(localFilepath)=>{
     }
 }
 
-export{cloudinaryUpload}
+const cloudinaryDelete = async (cloudinaryUrl)=>{
+    try {
+        const publicId =  extractPublicId(cloudinaryUrl)
+        const response = await cloudinary.api.delete_resources([publicId],{type:"upload",})
+       
+        
+        return response;
+    } catch (error) {
+        throw new ApiError(500, error?.message)
+    }
+}
+
+export{cloudinaryUpload,cloudinaryDelete}

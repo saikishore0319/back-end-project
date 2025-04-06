@@ -17,6 +17,7 @@
     "@types/mongoose-aggregate-paginate-v2": "^1.0.12",
     "bcrypt": "^5.1.1",
     "cloudinary": "^2.6.0",
+    "cloudinary-build-url": "^0.2.4",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
