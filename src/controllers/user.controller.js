@@ -4,7 +4,6 @@ import { User } from "../models/user.model.js";
 import { cloudinaryUpload, cloudinaryDelete } from "../utils/coludinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
-
 /**
  * The function generates access and refresh tokens for a user based on their ID.
  * @param userId - The `userId` parameter is the unique identifier of a user for whom we want to
@@ -277,7 +276,6 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 const updateUserDetails = asyncHandler(async (req, res) => {
   const { fullName, email } = req.body;
   // console.log("here");
-  
 
   if (!(fullName || email)) {
     throw new ApiError(
@@ -304,15 +302,13 @@ const updateUserDetails = asyncHandler(async (req, res) => {
 });
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
-
   const localPath = req.file?.path;
-
 
   const user = await User.findById(req.user?._id).select("avatar");
   // console.log(user)
   const cloudinaryUrl = user?.avatar; // Access the avatar field
   // console.log(cloudinaryUrl);
-  
+
   if (!localPath) {
     throw new ApiError(400, "Avatar image is required");
   }
@@ -335,7 +331,6 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   if (cloudinaryUrl) {
     const response = await cloudinaryDelete(cloudinaryUrl);
     console.log(response);
-    
   }
 
   return res
@@ -345,9 +340,8 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 const updateUserCoverImage = asyncHandler(async (req, res) => {
   const localPath = req.file?.path;
 
-  
   const coverimg = await User.findById(req.user._id).select("coverImage");
-  const cloudinaryUrl = coverimg?.coverImage
+  const cloudinaryUrl = coverimg?.coverImage;
   if (!localPath) {
     throw new ApiError(400, "Cover image file is required");
   }
@@ -374,6 +368,82 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, updatedUser, "user updated successfully"));
 });
+
+const userAccountDetails = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+
+  if (!username?.trim()) {
+    throw new ApiError(400, "user is not found");
+  }
+
+  const channel = User.aggregate([
+    /* The below code is a MongoDB aggregation pipeline stage using the  operator to filter
+   documents based on the value of the "userName" field. It is checking if the "userName" field is
+   equal to the value of the variable "username" converted to lowercase using the optional chaining
+   operator (?.). */
+    {
+      $match: {
+        userName: username?.toLowerCase(),
+      },
+    },
+    /* The below code is using the `` aggregation pipeline stage in MongoDB to perform a left
+   outer join between the current collection (presumably a collection of channels) and the
+   "subscriptions" collection. It is matching documents where the `_id` field in the current
+   collection matches the `channel` field in the "subscriptions" collection. The result of this
+   operation is stored in a new field called "subscribers" in the output documents. */
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    {
+      $addFields: {
+        subcribersCount: {
+          $size: "$subscribers",
+        },
+        channelsSubscribedTo: {
+          $size: "$subscribedTo",
+        },
+        isSubscribed: {
+          if: { $in: [req.user?.id, "subscribers.subscriber "] },
+          then: true,
+          else: false,
+        },
+      },
+    },
+    {
+      $project: {
+        fullName: 1,
+        userName: 1,
+        avatar: 1,
+        channelsSubscribedTo: 1,
+        isSubscribed: 1,
+        subcribersCount: 1,
+        coverImage: 1,
+        email: 1
+      },
+    },
+  ]);
+
+  if(!channel?.length){
+    throw new ApiError(404, "channel does not exist")
+  }
+
+  return res
+  .status(200)
+  .json(new ApiResponse(200, channel[0], "User channel fetched successfully"))
+});
 export {
   registerUser,
   loginUser,
@@ -384,4 +454,5 @@ export {
   updateUserDetails,
   updateUserAvatar,
   updateUserCoverImage,
+  userAccountDetails,
 };
