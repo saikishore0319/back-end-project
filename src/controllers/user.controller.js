@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiErrors.js";
 import { User } from "../models/user.model.js";
 import { cloudinaryUpload, cloudinaryDelete } from "../utils/coludinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import mongoose from "mongoose";
 
 /**
  * The function generates access and refresh tokens for a user based on their ID.
@@ -370,20 +371,20 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 });
 
 const userAccountDetails = asyncHandler(async (req, res) => {
-  const { username } = req.params;
-
-  if (!username?.trim()) {
+  const { userName } = req.params;
+  console.log(req.params)
+  if (!userName?.trim()) {
     throw new ApiError(400, "user is not found");
   }
 
-  const channel = User.aggregate([
+  const channel = await User.aggregate([
     /* The below code is a MongoDB aggregation pipeline stage using the  operator to filter
    documents based on the value of the "userName" field. It is checking if the "userName" field is
    equal to the value of the variable "username" converted to lowercase using the optional chaining
    operator (?.). */
     {
       $match: {
-        userName: username?.toLowerCase(),
+        userName: userName?.toLowerCase(),
       },
     },
     /* The below code is using the `` aggregation pipeline stage in MongoDB to perform a left
@@ -416,7 +417,7 @@ const userAccountDetails = asyncHandler(async (req, res) => {
           $size: "$subscribedTo",
         },
         isSubscribed: {
-          if: { $in: [req.user?.id, "subscribers.subscriber "] },
+          if: { $in: [req.user?.id, "$subscribers.subscriber"] },
           then: true,
           else: false,
         },
@@ -436,6 +437,8 @@ const userAccountDetails = asyncHandler(async (req, res) => {
     },
   ]);
 
+  console.log(channel)
+
   if(!channel?.length){
     throw new ApiError(404, "channel does not exist")
   }
@@ -444,6 +447,61 @@ const userAccountDetails = asyncHandler(async (req, res) => {
   .status(200)
   .json(new ApiResponse(200, channel[0], "User channel fetched successfully"))
 });
+
+
+const getWatchHistroy = asyncHandler(async(req, res)=>{
+
+  const user = await User.aggregate([
+    {
+      $match:{
+        _id: new mongoose.Types.ObjectId(req.user._id)
+      }
+    },
+    {
+      $lookup:{
+        from:"videos",
+        localField:"watchHistory",
+        foreignField:"_id",
+        as:"watchHistory",
+        pipeline:[
+          {
+            $lookup:{
+              from:"users",
+              localField:"owner",
+              foreignField:"_id",
+              as:"owner",
+              pipeline:[
+                {
+                  $project:{
+                    fullName:1,
+                    userName:1,
+                    avatar: 1,
+                  }
+                }
+              ]
+            }
+          },
+          {
+            $addFields:{
+              owner:{
+                $first: "$owner"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ])
+
+  if(!user.length){
+    console.log("User not found");
+    throw new ApiError(404, "User not found")
+  }
+
+  return res
+  .status(200)
+  .json( new ApiResponse(200, user[0].watchHistory, "Watch history fetched successfully "))
+})
 export {
   registerUser,
   loginUser,
@@ -455,4 +513,5 @@ export {
   updateUserAvatar,
   updateUserCoverImage,
   userAccountDetails,
+  getWatchHistroy,
 };
